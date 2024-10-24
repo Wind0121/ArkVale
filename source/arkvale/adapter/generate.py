@@ -7,7 +7,7 @@ _Q_INPUT_IDS: torch.LongTensor = None
 
 
 def _3_stages_greedy_search(
-    self,
+    self: GenerationMixin,
     input_ids: torch.LongTensor,
     logits_processor: Optional[LogitsProcessorList] = None,
     stopping_criteria: Optional[StoppingCriteriaList] = None,

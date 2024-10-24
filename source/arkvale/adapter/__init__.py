@@ -3,4 +3,4 @@ from .generate import (
     disable_3_stages_gen,
     reset_q_input_ids,
 )
-from .llama import LlamaForCausalLM
+from .modeling import enable_arkvale
