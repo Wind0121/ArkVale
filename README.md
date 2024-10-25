@@ -39,6 +39,7 @@ adapter.enable_arkvale(
     dtype=dtype, 
     device=dev, 
     page_size=32,
+    # page_budgets=None, # page_budgets=None means "full" (no eviction & recall)
     page_budgets=4096 // 32,
     page_topks=32,
     n_max_bytes=40 * (1 << 30),
