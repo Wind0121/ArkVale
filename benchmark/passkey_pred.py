@@ -73,13 +73,13 @@ def passkey_retrieval_test(
     if use_3_stages_gen:
         generate.enable_3_stages_gen()
         q_input_ids = tokenizer(
-            [prompt_postfix] * args.batch_size, truncation=False, return_tensors="pt"
+            [prompt_postfix], truncation=False, return_tensors="pt"
         ).to(device)["input_ids"]
         generate.reset_q_input_ids(q_input_ids)
     else:
         prompt += prompt_postfix
 
-    inputs = tokenizer([prompt] * args.batch_size, return_tensors="pt").to(device)
+    inputs = tokenizer([prompt], return_tensors="pt").to(device)
     answer_ids = tokenizer(answer, return_tensors="pt").input_ids[:, 1:]  # drop BOS
     # answer_ids = tokenizer(answer, return_tensors="pt").input_ids[:, :]  # drop BOS
     context_length = inputs.input_ids.shape[-1]
