@@ -95,7 +95,7 @@ void prefill_select_topk(
 class BatchPrefillWithPagedKVCachePyTorchWrapper {
  public:
   static BatchPrefillWithPagedKVCachePyTorchWrapper Create(unsigned int layout) {
-    return BatchPrefillWithPagedKVCachePyTorchWrapper(layout);
+    return BatchPrefillWithPagedKVCachePyTorchWrapper(layout);  // layout 通常为 0，表示 NHD
   }
   void BeginForward(torch::Tensor workspace_buffer, torch::Tensor qo_indptr,
                     unsigned int batch_size, unsigned int num_qo_heads, unsigned int num_kv_heads,

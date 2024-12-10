@@ -42,6 +42,7 @@ def _arkvale_attn_forward(
     n_layers = state.n_layers
 
     if cur_id == 0:
+        # decode 在这里分配好 page
         state.begin_forward(bsz, q_len)
 
     if self.config.pretraining_tp > 1:
@@ -131,25 +132,34 @@ def _arkvale_attn_forward(
 
     if q_len > 1:
         state.attn_layers[cur_id] = self
+        # 注意这里使用的是 state.alloc_page，在 gpu 上分配 page id
         kvc.prefill_alloc_n_tokens(q_len, state.alloc_page)
 
+    # 这里就是将 kv states 添加到 cache 的入口
     state.append_paged_kv_cache(cur_id, key_states, value_states)
 
     if q_len > 1:
         if budget is not None:
             with torch.cuda.stream(state.prefill_backup_stream):
+                # 在 prefill backup 流上进行操作，异步地拷贝到 CPU 中
                 state.prefill_backup_pages(cur_id)
+                # event 用于监控 cuda 流
                 evt = torch.cuda.Event()
                 evt.record(state.prefill_backup_stream)
+                # 进行记录，backup 未完成是不能进行 evict 的
                 state.prefill_backup_events[cur_id] = evt
+            # 计算 digest，并将其存放到 digest cache 中
             state.prefill_save_digests(cur_id, key_states)
+        # 进行 prefill 的注意力计算
         attn_output = state.prefill_sdpa(cur_id, query_states)
+        # 用 query 最后一个 token 来筛选 top-k 个 prefill page，防止超出 budget
         infer_state.prefill_evict_extra_pages(
             cur_id, query_states[:, -1:, ...].contiguous()
         )
     else:
         attn_page_ids = kvc.c2p
-        if budget is not None and kvc.n_pages > budget:
+        if budget is not None and kvc.n_pages > budget:     # page 大小超出 budget 后，就需要考虑 select 了
+            # 这个分支到后面是必须进入的
             if do_recv_pf:
                 if state.on_decode_prefetch[pf_src_id % (n_pf_layers + 1)]:
                     state.default_stream.wait_stream(
@@ -199,8 +209,10 @@ def enable_arkvale(
     infer_state: InferState = None,
     **kwargs,
 ):
+    # infer_state 一般都是 None
     if infer_state is None:
         config = self.model.config
+        # 依据 model config 初始化 InferState
         infer_state = InferState(
             n_layers=config.num_hidden_layers,
             n_qo_heads=config.num_attention_heads,
@@ -212,30 +224,38 @@ def enable_arkvale(
             **kwargs,
         )
 
+    # lm_head 是用于将 hidden_state 转化到 vocab_size 的线性层
     if hasattr(self, "lm_head"):
         _lm_head_forward = self.lm_head.forward
+        # 意思是只对最后一个 token 进行转换，毕竟前面的 token 转换了也不会用
         self.lm_head.forward = lambda x: _lm_head_forward(x[:, -1:, :])
 
     for mod in self.modules():
         mod_cls = str(mod.__class__)
+        # 遍历所有 module，对 Attention 和 Norm 改造
         if "Attention" in mod_cls:
+            # 用 arkvale attention 替代
             mod.forward = (
                 lambda mod: lambda *args, **kwargs: _arkvale_attn_forward(
                     mod, *args, infer_state=infer_state, **kwargs
                 )
             )(mod)
         elif "RMSNorm" in mod_cls:
+            # 用 arkvale norm 替代
             mod.forward = (
                 lambda mod: lambda *args, **kwargs: _arkvale_rms_norm_forward(
                     mod, *args, **kwargs
                 )
             )(mod)
 
+    # 将 LlamaForCausalLM 的函数进行替代
     _old_self_prepare_inputs_for_generation = self.prepare_inputs_for_generation
     _old_self_forward = self.forward
 
+    # 装饰器用于复制传入函数的 meta data，主要是 doc 和 name
     @wraps(_old_self_prepare_inputs_for_generation)
     def _new_self_prepare_inputs_for_generation(input_ids, *args, **kwargs):
+        # 实际上没有什么改动，就是将 use_cache 置为 False，并且禁止使用 past_key_values
         kwargs["use_cache"] = False
         past_kv = kwargs.get("past_key_values", None)
         if past_kv is not None:
@@ -246,10 +266,11 @@ def enable_arkvale(
 
     @wraps(_old_self_forward)
     def _new_self_forward(*args, **kwargs):
-        ret = _old_self_forward(*args, **kwargs)
-        ret["past_key_values"] = "dummy"
+        ret = _old_self_forward(*args, **kwargs)    # 正常调用
+        ret["past_key_values"] = "dummy"            # 返回的 kv cache 置为 dummy
         return ret
 
+    # monkey patch
     self.prepare_inputs_for_generation = _new_self_prepare_inputs_for_generation
     self.forward = _new_self_forward
 
