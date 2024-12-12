@@ -18,7 +18,7 @@ def parse_args(cmd_args=None):
     ap.add_argument(
         "--model",
         type=str,
-        default="longchat-v1.5-7b-32k",
+        default="llama-3.1-8B-inst",
         choices=[
             "llama2-7b-chat-4k",
             "longchat-v1.5-7b-32k",
@@ -26,6 +26,7 @@ def parse_args(cmd_args=None):
             "mistral-7b-inst",
             "llama-3-8b-inst-64k",
             "llama-3-8b-inst-1048k",
+            "llama-3.1-8B-inst"
         ],
     )
     ap.add_argument("--name", type=str, default="default")
@@ -34,14 +35,14 @@ def parse_args(cmd_args=None):
     ap.add_argument("--page-size", type=int, default=32)
     ap.add_argument("--page-budgets", type=int, default=128)
     ap.add_argument("--n-unlimited-layers", type=int, default=2)
-    ap.add_argument("--n-max-bytes", type=int, default=40 * (1 << 30))
-    ap.add_argument("--n-max-cpu-bytes", type=int, default=80 * (1 << 30))
+    ap.add_argument("--n-max-bytes", type=int, default=10 * (1 << 30))
+    ap.add_argument("--n-max-cpu-bytes", type=int, default=5 * (1 << 30))
     ap.add_argument("--page-topks", type=int, default=32)
     ap.add_argument("--batch-size", type=int, default=1)
     ap.add_argument("--n-win-pages", type=int, default=2)
     ap.add_argument("--n-sink-pages", type=int, default=1)
     ap.add_argument("--use-3-stages-gen", action="store_true")
-    ap.add_argument("--repeat", type=int, default=-1)
+    ap.add_argument("--repeat", type=int, default=1)
     ap.add_argument("--lengths", type=int, nargs="*")
     args = ap.parse_args(cmd_args)
     args.e = False
@@ -297,7 +298,7 @@ if __name__ == "__main__":
     )
 
     args.name = f"perf-{args.name}"
-    datasets = ["gov_report"]
+    datasets = ["qasper"]
     # we design specific prompt format and max generation length for each task, feel free to modify them to optimize model output
     dataset2prompt = json.load(open("longbench_config/dataset2prompt.json", "r"))
     dataset2maxlen = json.load(open("longbench_config/dataset2maxlen.json", "r"))

@@ -9,5 +9,6 @@
     "vicuna-v1.5-7b-16k": "lmsys/vicuna-7b-v1.5-16k",
     "mistral-7b-inst": "mistralai/Mistral-7B-Instruct-v0.3",
     "llama-3-8b-inst-64k": "MaziyarPanahi/Llama-3-8B-Instruct-64k",
-    "llama-3-8b-inst-1048k": "gradientai/Llama-3-8B-Instruct-Gradient-1048k"
+    "llama-3-8b-inst-1048k": "gradientai/Llama-3-8B-Instruct-Gradient-1048k",
+    "llama-3.1-8B-inst": "/data/llm/Llama-3.1-8B-Instruct-Old-Config"
 }
